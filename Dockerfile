@@ -11,7 +11,6 @@ RUN pip install --upgrade pip
 COPY requirements.txt .
 
 # Install NLTK and download its data first
-# This helps with Docker layer caching and build failures
 RUN pip install nltk==3.8.1
 RUN python -c "import nltk; nltk.download('stopwords')"
 
@@ -21,6 +20,6 @@ RUN pip install -r requirements.txt
 # Copy the rest of your application code
 COPY . .
 
-# Railway provides the PORT environment variable.
-# Gunicorn will bind to the port specified by the $PORT env var.
-CMD sh -c "gunicorn app:app --bind 0.0.0.0:$PORT"
+# The CMD instruction will be run by a shell, which correctly handles the $PORT variable.
+# We use "python -m gunicorn" as the most reliable way to run gunicorn.
+CMD python -m gunicorn app:app --bind 0.0.0.0:$PORT
