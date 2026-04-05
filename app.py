@@ -17,15 +17,17 @@ except LookupError:
 stemmer = PorterStemmer()
 stop_words = set(stopwords.words("english"))
 
-# Load model with error handling
+# Load model with error handling (optional - will work without it)
 try:
+    import pickle
     model = pickle.load(open("spam_model.pkl", "rb"))
     vectorizer = pickle.load(open("vectorizer.pkl", "rb"))
+    ML_AVAILABLE = True
 except Exception as e:
-    print(f"Warning: Error loading model - {e}")
-    # Fallback: use rule-based detection only
+    print(f"ML model not available: {e} - using rule-based detection only")
     model = None
     vectorizer = None
+    ML_AVAILABLE = False
 
 # Preprocess function
 def preprocess_text(text):
@@ -78,40 +80,50 @@ def predict():
         return jsonify({'error': 'No message provided'})
 
     try:
-        # Always use rule-based detection first
+        # Primary: Rule-based detection (always works)
         rule_prediction = rule_based_check(message)
 
-        # Try ML model, but always have a fallback
+        # Secondary: ML model (if available)
         spam_prob = 0.5
-        ml_prediction = 0
+        ml_available = False
 
-        try:
-            if model is not None and vectorizer is not None:
+        if ML_AVAILABLE and model is not None and vectorizer is not None:
+            try:
                 processed = preprocess_text(message)
                 vectorized = vectorizer.transform([processed])
                 proba = model.predict_proba(vectorized)[0]
                 spam_prob = float(proba[1])
                 ml_prediction = int(model.predict(vectorized)[0])
-        except Exception as ml_error:
-            print(f"ML prediction failed: {ml_error}, using rule-based only")
-            # Keep default values
+                ml_available = True
 
-        # Combine ML and rule-based predictions
-        if ml_prediction == 1 or rule_prediction:
-            is_spam = True
-            spam_prob = max(spam_prob, 0.8)  # Boost confidence for detected spam
-        else:
-            is_spam = False
-            spam_prob = min(spam_prob, 0.2)  # Reduce confidence for safe messages
+                # Combine ML and rule-based
+                if ml_prediction == 1 or rule_prediction:
+                    is_spam = True
+                    spam_prob = max(spam_prob, 0.85)
+                else:
+                    is_spam = False
+                    spam_prob = min(spam_prob, 0.15)
+            except Exception as ml_error:
+                print(f"ML prediction failed: {ml_error}")
+                ml_available = False
 
-        # For very short messages, be more conservative
-        if len(message) < 3:
+        # If no ML, use rule-based only
+        if not ml_available:
             if rule_prediction:
                 is_spam = True
                 spam_prob = 0.9
             else:
                 is_spam = False
                 spam_prob = 0.1
+
+        # Special handling for very short messages
+        if len(message) <= 2:
+            if rule_prediction:
+                is_spam = True
+                spam_prob = 0.95
+            else:
+                is_spam = False
+                spam_prob = 0.05
 
         if is_spam:
             result = f"🚨 SPAM DETECTED ({spam_prob*100:.1f}%)"
@@ -126,10 +138,10 @@ def predict():
             'color': color,
             'insight': insight,
             'spam_score': spam_prob * 100,
-            'safe_score': (1 - spam_prob) * 100
+            'safe_score': (1 - spam_prob) * 100,
+            'ml_used': ml_available
         })
     except Exception as e:
-        # Ultimate fallback - always return something
         return jsonify({
             'result': "⚠️ ANALYSIS FAILED - Please try again",
             'color': "orange",
