@@ -78,33 +78,40 @@ def predict():
         return jsonify({'error': 'No message provided'})
 
     try:
-        # Use rule-based detection as primary if model fails
+        # Always use rule-based detection first
         rule_prediction = rule_based_check(message)
 
-        # Try to use ML model if available
+        # Try ML model, but always have a fallback
         spam_prob = 0.5
+        ml_prediction = 0
+
         try:
             if model is not None and vectorizer is not None:
                 processed = preprocess_text(message)
                 vectorized = vectorizer.transform([processed])
                 proba = model.predict_proba(vectorized)[0]
                 spam_prob = float(proba[1])
-                ml_prediction = model.predict(vectorized)[0]
-
-                if ml_prediction == 1 or rule_prediction:
-                    is_spam = True
-                    spam_prob = max(spam_prob, 0.9)
-                else:
-                    is_spam = False
-            else:
-                # Fallback to rule-based only
-                is_spam = rule_prediction
-                spam_prob = 0.85 if is_spam else 0.15
+                ml_prediction = int(model.predict(vectorized)[0])
         except Exception as ml_error:
-            # If ML fails, use rule-based detection
-            print(f"ML prediction failed: {ml_error}, using rule-based detection")
-            is_spam = rule_prediction
-            spam_prob = 0.85 if is_spam else 0.15
+            print(f"ML prediction failed: {ml_error}, using rule-based only")
+            # Keep default values
+
+        # Combine ML and rule-based predictions
+        if ml_prediction == 1 or rule_prediction:
+            is_spam = True
+            spam_prob = max(spam_prob, 0.8)  # Boost confidence for detected spam
+        else:
+            is_spam = False
+            spam_prob = min(spam_prob, 0.2)  # Reduce confidence for safe messages
+
+        # For very short messages, be more conservative
+        if len(message) < 3:
+            if rule_prediction:
+                is_spam = True
+                spam_prob = 0.9
+            else:
+                is_spam = False
+                spam_prob = 0.1
 
         if is_spam:
             result = f"🚨 SPAM DETECTED ({spam_prob*100:.1f}%)"
@@ -122,7 +129,15 @@ def predict():
             'safe_score': (1 - spam_prob) * 100
         })
     except Exception as e:
-        return jsonify({'error': str(e)})
+        # Ultimate fallback - always return something
+        return jsonify({
+            'result': "⚠️ ANALYSIS FAILED - Please try again",
+            'color': "orange",
+            'insight': "Error occurred during analysis",
+            'spam_score': 50,
+            'safe_score': 50,
+            'error': str(e)
+        })
 
 if __name__ == '__main__':
     app.run(debug=False, host='0.0.0.0', port=int(os.environ.get('PORT', 5000)))
