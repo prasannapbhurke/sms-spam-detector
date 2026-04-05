@@ -17,9 +17,8 @@ except LookupError:
 stemmer = PorterStemmer()
 stop_words = set(stopwords.words("english"))
 
-# Load model with error handling (optional - will work without it)
+# Load model with error handling
 try:
-    import pickle
     model = pickle.load(open("spam_model.pkl", "rb"))
     vectorizer = pickle.load(open("vectorizer.pkl", "rb"))
     ML_AVAILABLE = True
@@ -57,16 +56,62 @@ def rule_based_check(text):
         return True
     return False
 
-# Get insight
-def get_insight(text):
-    indicators = []
-    if "http" in text or ".com" in text or ".in" in text:
-        indicators.append("link detected")
-    if any(x in text.lower() for x in ["verify", "login", "update"]):
-        indicators.append("account action request")
-    if any(x in text.lower() for x in ["win", "prize", "money"]):
-        indicators.append("money/offer claim")
-    return "⚠️ " + ", ".join(indicators) if indicators else "✅ Looks normal"
+# New detailed insight function
+def get_detailed_insight(text):
+    text_lower = text.lower()
+    insights = []
+    
+    # Finding 1: Presence of a link
+    if re.search(r'https?://[^\s]+', text_lower) or re.search(r'www\.[^\s]+', text_lower):
+        insights.append({
+            "emoji": "🔗",
+            "reason": "Contains a Link",
+            "description": "Messages with links should be treated with caution. Don't click unless you trust the sender."
+        })
+
+    # Finding 2: Urgency keywords
+    urgency_keywords = ["urgent", "act now", "limited time", "expires", "immediately"]
+    if any(word in text_lower for word in urgency_keywords):
+        insights.append({
+            "emoji": "⏳",
+            "reason": "Sense of Urgency",
+            "description": "Scammers often create a false sense of urgency to pressure you into acting without thinking."
+        })
+
+    # Finding 3: Financial/Prize keywords
+    money_keywords = ["win", "won", "prize", "claim", "free", "earn money", "cash", "lottery"]
+    if any(word in text_lower for word in money_keywords):
+        insights.append({
+            "emoji": "💰",
+            "reason": "Potential Prize/Money Scam",
+            "description": "Be wary of unexpected offers of money or prizes. If it sounds too good to be true, it probably is."
+        })
+
+    # Finding 4: Account action keywords
+    account_keywords = ["verify", "login", "update", "suspended", "locked", "restricted"]
+    if any(word in text_lower for word in account_keywords):
+        insights.append({
+            "emoji": "🔒",
+            "reason": "Account Security Alert",
+            "description": "This message asks you to take action on an account. Never use links in an SMS to log in. Go directly to the official website or app."
+        })
+        
+    # Finding 5: Character abuse
+    if re.search(r'(!\s*!|£\s*£|\$\s*\$)', text_lower):
+        insights.append({
+            "emoji": "‼️",
+            "reason": "Unusual Formatting",
+            "description": "Excessive use of special characters can be a sign of an unprofessional or automated spam message."
+        })
+
+    if not insights:
+        insights.append({
+            "emoji": "✅",
+            "reason": "Looks Normal",
+            "description": "Our automated checks didn't find any common spam indicators, but always remain cautious."
+        })
+        
+    return insights
 
 @app.route('/')
 def index():
@@ -132,11 +177,21 @@ def predict():
             result = f"✅ SAFE MESSAGE ({(1-spam_prob)*100:.1f}%)"
             color = "green"
 
-        insight = get_insight(message)
+        # Get the new detailed insights
+        detailed_insights = get_detailed_insight(message)
+        
+        # If the message is safe, we should only show the "Looks Normal" insight.
+        if not is_spam:
+            detailed_insights = [{
+                "emoji": "✅",
+                "reason": "Looks Normal",
+                "description": "Our automated checks didn't find any common spam indicators, but always remain cautious."
+            }]
+
         return jsonify({
             'result': result,
             'color': color,
-            'insight': insight,
+            'detailed_insight': detailed_insights, # New key
             'spam_score': spam_prob * 100,
             'safe_score': (1 - spam_prob) * 100,
             'ml_used': ml_available
@@ -145,7 +200,11 @@ def predict():
         return jsonify({
             'result': "⚠️ ANALYSIS FAILED - Please try again",
             'color': "orange",
-            'insight': "Error occurred during analysis",
+            'detailed_insight': [{
+                "emoji": "⚙️",
+                "reason": "Analysis Error",
+                "description": f"An unexpected error occurred: {e}"
+            }],
             'spam_score': 50,
             'safe_score': 50,
             'error': str(e)
