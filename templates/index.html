@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SMS Spam Detector - AI Powered</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+</head>
+<body>
+    <div class="navbar">
+        <h2>🤖 SMS SPAM DETECTOR</h2>
+        <p>Powered by AI • Real-time Detection</p>
+    </div>
+
+    <div class="container">
+        <h1>Analyze SMS Messages</h1>
+
+        <div class="input-section">
+            <label for="message">Enter SMS Message:</label>
+            <textarea id="message" placeholder="Paste or type the SMS message here..."></textarea>
+        </div>
+
+        <button id="analyze-btn">🔍 Analyze Message</button>
+
+        <div id="result" class="result"></div>
+
+        <div id="insight" class="insight"></div>
+
+        <div class="progress-section">
+            <div>
+                <label>Spam Score:</label>
+                <div class="progress-bar">
+                    <div id="spam-bar" class="progress-fill"></div>
+                </div>
+            </div>
+            <div>
+                <label>Safe Score:</label>
+                <div class="progress-bar">
+                    <div id="safe-bar" class="progress-fill"></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="history-section">
+            <h3>📋 History:</h3>
+            <div id="history" class="history"></div>
+            <button id="clear-btn">🗑️ Clear History</button>
+        </div>
+    </div>
+
+    <script src="{{ url_for('static', filename='js/script.js') }}"></script>
+</body>
+</html>
