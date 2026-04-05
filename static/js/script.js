@@ -1,58 +1,66 @@
 document.addEventListener('DOMContentLoaded', function() {
     const messageTextarea = document.getElementById('message');
-    const analyzeBtn = document.getElementById('analyze-btn');
     const resultDiv = document.getElementById('result');
-    const insightDiv = document.getElementById('insight'); // This will now be the container for detailed insights
+    const insightDiv = document.getElementById('insight');
     const spamBar = document.getElementById('spam-bar');
     const safeBar = document.getElementById('safe-bar');
     const historyDiv = document.getElementById('history');
     const clearBtn = document.getElementById('clear-btn');
+    const analysisStatus = document.getElementById('analysis-status');
 
-    analyzeBtn.addEventListener('click', analyzeMessage);
-    clearBtn.addEventListener('click', clearHistory);
-    
-    // Allow analysis by pressing Ctrl+Enter or Cmd+Enter
-    messageTextarea.addEventListener('keydown', function(e) {
-        if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
-            analyzeMessage();
-        }
-    });
+    // --- Real-time Analysis Logic ---
+    let debounceTimeout;
+    messageTextarea.addEventListener('input', () => {
+        // Clear previous timeout
+        clearTimeout(debounceTimeout);
 
-    function analyzeMessage() {
         const message = messageTextarea.value.trim();
+        
         if (!message) {
-            alert('Please enter a message to analyze.');
+            // Instantly clear results if textarea is empty
+            clearResults();
+            analysisStatus.textContent = 'Start typing to analyze...';
             return;
         }
 
-        // Show loading state
-        analyzeBtn.textContent = 'Analyzing...';
-        analyzeBtn.disabled = true;
+        analysisStatus.textContent = 'Typing...';
+
+        // Set a new timeout
+        debounceTimeout = setTimeout(() => {
+            analyzeMessage(message);
+        }, 500); // 500ms delay after user stops typing
+    });
+
+    clearBtn.addEventListener('click', clearHistory);
+
+    function clearResults() {
         resultDiv.innerHTML = '';
         insightDiv.innerHTML = '';
         spamBar.style.width = '0%';
         safeBar.style.width = '0%';
+    }
+
+    function analyzeMessage(message) {
+        analysisStatus.textContent = 'Analyzing...';
 
         fetch('/predict', {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
+            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ message: message }),
         })
         .then(response => response.json())
         .then(data => {
+            analysisStatus.textContent = 'Analysis Complete';
+            
             if (data.error) {
                 resultDiv.textContent = `Error: ${data.error}`;
                 resultDiv.style.color = 'orange';
                 return;
             }
 
-            // Main result text
             resultDiv.textContent = data.result;
             resultDiv.style.color = data.color;
 
-            // Display detailed insights
             insightDiv.innerHTML = '<h3>Detailed Analysis:</h3>';
             const insightList = document.createElement('ul');
             insightList.className = 'insight-list';
@@ -69,25 +77,19 @@ document.addEventListener('DOMContentLoaded', function() {
             });
             insightDiv.appendChild(insightList);
 
-            // Update progress bars
             spamBar.style.width = `${data.spam_score}%`;
             safeBar.style.width = `${data.safe_score}%`;
 
-            // Add to history
             const historyEntry = document.createElement('div');
             historyEntry.className = 'history-entry';
             historyEntry.innerHTML = `<p class="history-message">"${message}"</p><p class="history-result" style="color:${data.color};">${data.result}</p>`;
-            historyDiv.prepend(historyEntry); // Prepend to show newest first
+            historyDiv.prepend(historyEntry);
         })
         .catch(error => {
             console.error('Error:', error);
-            resultDiv.textContent = 'An error occurred while analyzing the message.';
+            analysisStatus.textContent = 'Analysis Failed';
+            resultDiv.textContent = 'An error occurred during analysis.';
             resultDiv.style.color = 'red';
-        })
-        .finally(() => {
-            // Reset button state
-            analyzeBtn.textContent = '🔍 Analyze Message';
-            analyzeBtn.disabled = false;
         });
     }
 

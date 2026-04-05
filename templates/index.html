@@ -8,19 +8,20 @@
 </head>
 <body>
     <div class="navbar">
-        <h2>🤖 SMS SPAM DETECTOR</h2>
-        <p>Powered by AI • Real-time Detection</p>
+        <h2>🤖 Real-time SMS Spam Detector</h2>
+        <p>Powered by AI • Instant Analysis</p>
     </div>
 
     <div class="container">
         <h1>Analyze SMS Messages</h1>
 
         <div class="input-section">
-            <label for="message">Enter SMS Message:</label>
-            <textarea id="message" placeholder="Paste or type the SMS message here..."></textarea>
+            <label for="message">Enter SMS Message Below:</label>
+            <textarea id="message" placeholder="Paste or type the SMS message here... Analysis will begin automatically."></textarea>
+            <div id="analysis-status" class="status-indicator">Start typing to analyze...</div>
         </div>
 
-        <button id="analyze-btn">🔍 Analyze Message</button>
+        <!-- The "Analyze" button is no longer needed -->
 
         <div id="result" class="result"></div>
 
