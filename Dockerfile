@@ -1,23 +1,26 @@
-# Use an official Python runtime as a parent image
+# Use a stable Python version
 FROM python:3.9-slim
 
-# Set the working directory in the container
+# Set working directory
 WORKDIR /app
 
-# Copy the requirements file into the container at /app
+# Upgrade pip
+RUN pip install --upgrade pip
+
+# Copy requirements file
 COPY requirements.txt .
 
-# Install any needed packages specified in requirements.txt
-RUN pip install --no-cache-dir -r requirements.txt
+# Install NLTK and download its data first
+# This helps with Docker layer caching and build failures
+RUN pip install nltk==3.8.1
+RUN python -c "import nltk; nltk.download('stopwords')"
 
-# Copy the rest of the application's code
+# Install other dependencies from requirements.txt
+RUN pip install -r requirements.txt
+
+# Copy the rest of your application code
 COPY . .
 
-# Make port 8080 available to the world outside this container
-EXPOSE 8080
-
-# Define environment variable
-ENV PORT 8080
-
-# Run app.py when the container launches
-CMD ["gunicorn", "app:app", "--bind", "0.0.0.0:8080"]
+# Railway provides the PORT environment variable.
+# Gunicorn will bind to the port specified by the $PORT env var.
+CMD sh -c "gunicorn app:app --bind 0.0.0.0:$PORT"
