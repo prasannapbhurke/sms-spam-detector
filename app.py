@@ -14,8 +14,8 @@ from nltk.stem import PorterStemmer
 # --- 1. CONFIGURATION & SECURITY ---
 app = Flask(__name__)
 
-# Production API Key - Sync this with your Android app
-API_KEY = "SG_Secure_6f9a2b8c3d1e4f7g8h9i0j1k2l3m4n"
+# Master API Key - MUST match across all platforms
+API_KEY = "SMS_GUARD_2024_SECURE"
 
 # Rate Limiting
 limiter = Limiter(
@@ -38,7 +38,8 @@ db = SQLAlchemy(app)
 def require_api_key(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
-        if request.headers.get('X-API-KEY') == API_KEY:
+        received_key = request.headers.get('X-API-KEY')
+        if received_key and received_key.strip() == API_KEY:
             return f(*args, **kwargs)
         else:
             return jsonify({"error": "Unauthorized"}), 401
@@ -103,13 +104,13 @@ def dashboard():
     return render_template('index.html')
 
 @app.route('/predict', methods=['POST'])
-@limiter.limit("10 per minute")
+@limiter.limit("20 per minute")
 @require_api_key
 def predict():
     data = request.get_json(silent=True)
     message = data.get('message', '').strip() if data else None
 
-    if not message or len(message) > 1000:
+    if not message:
         return jsonify({"error": "Invalid input"}), 400
 
     try:
@@ -134,15 +135,9 @@ def predict():
         db.session.rollback()
         return jsonify({"error": "Prediction failed"}), 500
 
-@app.route('/history', methods=['GET'])
-@require_api_key
-def get_history():
-    data = Prediction.query.order_by(Prediction.timestamp.desc()).limit(20).all()
-    return jsonify([p.to_dict() for p in data])
-
-@app.errorhandler(429)
-def ratelimit_handler(e):
-    return jsonify({"error": "Too many requests"}), 429
+@app.route('/health')
+def health():
+    return "OK", 200
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 5000)))

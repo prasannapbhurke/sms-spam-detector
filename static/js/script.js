@@ -7,8 +7,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const spamScoreText = document.getElementById('spamScoreText');
     const insightText = document.getElementById('insightText');
 
-    // This MUST match the API_KEY in app.py
-    const API_KEY = "SG_Secure_6f9a2b8c3d1e4f7g8h9i0j1k2l3m4n";
+    // UNIFIED API KEY - MUST MATCH app.py EXACTLY
+    const API_KEY = "SMS_GUARD_2024_SECURE";
 
     checkButton.addEventListener('click', async () => {
         const message = messageInput.value.trim();
@@ -28,7 +28,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    'X-API-KEY': API_KEY  // Added the security header
+                    'X-API-KEY': API_KEY
                 },
                 body: JSON.stringify({ message: message }),
             });
@@ -60,7 +60,6 @@ document.addEventListener('DOMContentLoaded', () => {
         predictionResult.textContent = isSpam ? `🚨 SPAM DETECTED (${(confidence * 100).toFixed(1)}%)` : `✅ SAFE MESSAGE (${(confidence * 100).toFixed(1)}%)`;
         resultContainer.classList.add(isSpam ? 'spam' : 'safe');
 
-        // Logic: if Spam, show confidence as spam prob. If Not Spam, show (1-confidence) for spam bar.
         let spamBarValue = isSpam ? parseFloat(confidence) * 100 : (1 - parseFloat(confidence)) * 100;
 
         spamScoreBar.style.width = spamBarValue + '%';
