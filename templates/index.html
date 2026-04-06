@@ -39,6 +39,7 @@
             <p>&copy; 2024 AI Spam Detector Project</p>
         </footer>
     </div>
-    <script src="{{ url_for('static', filename='js/script.js') }}"></script>
+    <!-- Added ?v=1.1 to force browser to reload the latest JS code -->
+    <script src="{{ url_for('static', filename='js/script.js') }}?v=1.1"></script>
 </body>
 </html>
