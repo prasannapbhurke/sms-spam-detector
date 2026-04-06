@@ -14,7 +14,7 @@ from nltk.stem import PorterStemmer
 # --- 1. CONFIGURATION & SECURITY ---
 app = Flask(__name__)
 
-# Master API Key - MUST match across all platforms
+# Master API Key
 API_KEY = "SMS_GUARD_2024_SECURE"
 
 # Rate Limiting
@@ -38,7 +38,10 @@ db = SQLAlchemy(app)
 def require_api_key(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
+        # DEBUG: Print headers to Railway logs to see what's happening
         received_key = request.headers.get('X-API-KEY')
+        print(f"DEBUG: X-API-KEY received: {received_key}")
+        
         if received_key and received_key.strip() == API_KEY:
             return f(*args, **kwargs)
         else:
@@ -104,7 +107,7 @@ def dashboard():
     return render_template('index.html')
 
 @app.route('/predict', methods=['POST'])
-@limiter.limit("20 per minute")
+@limiter.limit("50 per minute")
 @require_api_key
 def predict():
     data = request.get_json(silent=True)
@@ -140,4 +143,5 @@ def health():
     return "OK", 200
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 5000)))
+    port = int(os.environ.get('PORT', 5000))
+    app.run(host='0.0.0.0', port=port, debug=False)
