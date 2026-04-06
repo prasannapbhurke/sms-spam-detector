@@ -1,113 +1,148 @@
-from flask import Flask, request, jsonify
-import pickle
+import os
 import re
+import pickle
+import nltk
+from flask import Flask, request, jsonify, render_template, abort
+from flask_sqlalchemy import SQLAlchemy
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
+from datetime import datetime
+from functools import lru_cache, wraps
 from nltk.corpus import stopwords
 from nltk.stem import PorterStemmer
-import os
 
-# --- 1. Initialize Flask Application ---
+# --- 1. CONFIGURATION & SECURITY ---
 app = Flask(__name__)
 
-# --- 2. Load ML Models and Preprocessing Objects ---
-# These are loaded once when the application starts to ensure fast responses.
+# Production API Key - Sync this with your Android app
+API_KEY = "SG_Secure_6f9a2b8c3d1e4f7g8h9i0j1k2l3m4n"
+
+# Rate Limiting
+limiter = Limiter(
+    get_remote_address,
+    app=app,
+    default_limits=["200 per day", "50 per hour"],
+    storage_uri="memory://"
+)
+
+# Database Setup
+DB_URL = os.environ.get('DATABASE_URL')
+if DB_URL and DB_URL.startswith("postgres://"):
+    DB_URL = DB_URL.replace("postgres://", "postgresql://", 1)
+app.config['SQLALCHEMY_DATABASE_URI'] = DB_URL or 'sqlite:///spam_history.db'
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+
+db = SQLAlchemy(app)
+
+# --- 2. SECURITY MIDDLEWARE ---
+def require_api_key(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if request.headers.get('X-API-KEY') == API_KEY:
+            return f(*args, **kwargs)
+        else:
+            return jsonify({"error": "Unauthorized"}), 401
+    return decorated_function
+
+# Database Model
+class Prediction(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    message = db.Column(db.Text, nullable=False)
+    prediction = db.Column(db.String(50), nullable=False)
+    confidence = db.Column(db.Float, nullable=False)
+    timestamp = db.Column(db.DateTime, default=datetime.utcnow)
+
+    def to_dict(self):
+        return {
+            "message": self.message[:50] + "...", 
+            "prediction": self.prediction,
+            "confidence": self.confidence,
+            "time": self.timestamp.strftime('%H:%M')
+        }
+
+with app.app_context():
+    db.create_all()
+
+# --- 3. RESOURCE PRELOADING ---
 try:
-    # Use absolute paths for reliability, especially in production environments
-    # Assuming the files are in the same directory as app.py
-    base_dir = os.path.dirname(os.path.abspath(__file__))
-    model_path = os.path.join(base_dir, 'spam_model.pkl')
-    vectorizer_path = os.path.join(base_dir, 'vectorizer.pkl')
+    nltk.data.find('corpora/stopwords')
+except (LookupError, Exception):
+    nltk.download('stopwords', quiet=True)
 
-    with open(model_path, 'rb') as model_file:
-        model = pickle.load(model_file)
-    with open(vectorizer_path, 'rb') as vectorizer_file:
-        vectorizer = pickle.load(vectorizer_file)
-    
-    # Initialize NLTK components
-    # (No need to download every time, but good to have the objects ready)
-    stemmer = PorterStemmer()
-    stop_words = set(stopwords.words("english"))
-    
-    print("✅ Models and NLTK components loaded successfully.")
+MODEL = None
+VECTORIZER = None
+STOPWORDS = None
+STEMMER = None
 
-except FileNotFoundError as e:
-    print(f"❌ Error loading model files: {e}")
-    print("API cannot make predictions. Please ensure 'spam_model.pkl' and 'vectorizer.pkl' are present.")
-    model = None
-    vectorizer = None
-except Exception as e:
-    print(f"❌ An unexpected error occurred during initialization: {e}")
-    model = None
-    vectorizer = None
+def load_resources():
+    global MODEL, VECTORIZER, STOPWORDS, STEMMER
+    try:
+        base_dir = os.path.dirname(os.path.abspath(__file__))
+        with open(os.path.join(base_dir, 'spam_model.pkl'), 'rb') as f:
+            MODEL = pickle.load(f)
+        with open(os.path.join(base_dir, 'vectorizer.pkl'), 'rb') as f:
+            VECTORIZER = pickle.load(f)
+        STOPWORDS = set(stopwords.words("english"))
+        STEMMER = PorterStemmer()
+        print("🚀 Production-ready ML core loaded.")
+    except Exception as e:
+        print(f"❌ Initialization Error: {e}")
 
+load_resources()
 
-# --- 3. Preprocessing Function ---
-# This function cleans the input text to match the format used for training the model.
-def preprocess_text(text):
-    """Cleans and prepares text for the model."""
-    # Remove non-alphabetic characters and convert to lowercase
+@lru_cache(maxsize=1024)
+def preprocess(text):
+    if not text: return ""
     text = re.sub(r"\W", " ", str(text)).lower()
-    
-    # Tokenize and apply stemming, removing stopwords
-    words = text.split()
-    words = [stemmer.stem(word) for word in words if word not in stop_words]
-    
-    return " ".join(words)
+    return " ".join([STEMMER.stem(w) for w in text.split() if w not in STOPWORDS])
 
+# --- 4. SECURE ROUTES ---
 
-# --- 4. Create the API Endpoint ---
+@app.route('/')
+def dashboard():
+    return render_template('index.html')
+
 @app.route('/predict', methods=['POST'])
+@limiter.limit("10 per minute")
+@require_api_key
 def predict():
-    """
-    Receives a JSON request with a 'message' and returns a spam prediction.
-    """
-    # --- Error Handling for Model Loading ---
-    if not model or not vectorizer:
-        return jsonify({"error": "Server-side model not loaded. Cannot make predictions."}), 503 # Service Unavailable
+    data = request.get_json(silent=True)
+    message = data.get('message', '').strip() if data else None
 
-    # --- Input Validation ---
-    if not request.is_json:
-        return jsonify({"error": "Invalid input: request must be in JSON format."}), 400
-
-    data = request.get_json()
-    message = data.get('message')
-
-    if not message or not isinstance(message, str) or not message.strip():
-        return jsonify({"error": "Invalid input: 'message' key is missing, empty, or not a string."}), 400
+    if not message or len(message) > 1000:
+        return jsonify({"error": "Invalid input"}), 400
 
     try:
-        # --- Prediction Logic ---
-        # 1. Preprocess the input message
-        processed_message = preprocess_text(message)
-
-        # 2. Vectorize the processed message using the loaded TF-IDF vectorizer
-        vectorized_message = vectorizer.transform([processed_message])
-
-        # 3. Predict using the loaded model
-        prediction_code = model.predict(vectorized_message)[0]
+        processed = preprocess(message)
+        vectorized = VECTORIZER.transform([processed])
+        prediction_id = MODEL.predict(vectorized)[0]
+        label = "Spam" if prediction_id == 1 else "Not Spam"
         
-        # 4. Interpret the prediction
-        result = "Spam" if prediction_code == 1 else "Not Spam"
+        try:
+            probs = MODEL.predict_proba(vectorized)[0]
+            confidence = round(float(max(probs)), 2)
+        except:
+            confidence = 1.0
 
-        # --- Return the successful response ---
-        return jsonify({"prediction": result})
+        record = Prediction(message=message, prediction=label, confidence=confidence)
+        db.session.add(record)
+        db.session.commit()
+
+        return jsonify({"prediction": label, "confidence": confidence})
 
     except Exception as e:
-        # Catch any other unexpected errors during the process
-        print(f"An error occurred during prediction: {e}")
-        return jsonify({"error": "An internal error occurred during prediction."}), 500
+        db.session.rollback()
+        return jsonify({"error": "Prediction failed"}), 500
 
+@app.route('/history', methods=['GET'])
+@require_api_key
+def get_history():
+    data = Prediction.query.order_by(Prediction.timestamp.desc()).limit(20).all()
+    return jsonify([p.to_dict() for p in data])
 
-# --- 5. Health Check Endpoint (Optional but Recommended) ---
-@app.route('/', methods=['GET'])
-def health_check():
-    """Provides a simple health check to confirm the API is running."""
-    return "SMS Spam Detection API is running."
+@app.errorhandler(429)
+def ratelimit_handler(e):
+    return jsonify({"error": "Too many requests"}), 429
 
-
-# --- 6. Main Execution ---
 if __name__ == '__main__':
-    # Use Gunicorn or another production server instead of app.run() for deployment.
-    # The following is for local development testing.
-    # The port is read from the PORT environment variable, common in cloud platforms.
-    port = int(os.environ.get('PORT', 5000))
-    app.run(host='0.0.0.0', port=port, debug=False)
+    app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 5000)))
