@@ -2,7 +2,7 @@ flask==2.3.3
 flask-sqlalchemy==3.0.5
 flask-limiter==3.5.0
 nltk==3.8.1
-scikit-learn==1.3.1
+scikit-learn>=1.4.0
 numpy
 gunicorn
 Jinja2
