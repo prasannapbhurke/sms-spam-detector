@@ -10,11 +10,11 @@ import java.util.concurrent.TimeUnit;
 public class ApiHelper {
     private static final String TAG = "SpamGuard_Api";
     
-    // Replace with your actual Railway URL
-    private static final String API_URL = "https://your-project.up.railway.app/predict";
+    // Updated to your production Railway URL
+    private static final String API_URL = "https://sms-spam-detector-production.up.railway.app/predict";
     
-    // MUST match the API_KEY in app.py exactly
-    private static final String API_KEY = "your-very-secret-string-here";
+    // Unified security key
+    private static final String API_KEY = "SMS_GUARD_2024_SECURE";
 
     private static final OkHttpClient client = new OkHttpClient.Builder()
             .connectTimeout(15, TimeUnit.SECONDS)

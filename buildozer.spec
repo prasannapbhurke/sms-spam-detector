@@ -1,28 +1,30 @@
 [app]
 
 # Title of your application
-title = SMS Spam Detector
+title = AI Spam Guard
 
 # Package name
-package.name = smsspamdetector
+package.name = aispamguard
 
 # Package domain
-package.domain = org.smsspam
+package.domain = org.aispam
 
 # Source directory
 source.dir = .
 
 # Source files to include
-source.include_exts = py,png,jpg,kv,atlas,pkl,csv
+source.include_exts = py,png,jpg,kv,atlas
 
 # Version
-version = 1.0
+version = 1.1
 
 # Requirements
-requirements = python3,kivy,pyjnius,nltk,scikit-learn,numpy==1.21.6,gTTS,pillow
+# REMOVED scikit-learn and numpy because they fail to build on Android.
+# ADDED requests to communicate with your Railway API.
+requirements = python3,kivy,requests,urllib3,idna,chardet,certifi
 
 # Permissions
-android.permissions = INTERNET,WRITE_EXTERNAL_STORAGE,READ_EXTERNAL_STORAGE,RECORD_AUDIO
+android.permissions = INTERNET,RECEIVE_SMS
 
 # Orientation
 orientation = portrait
@@ -31,7 +33,7 @@ orientation = portrait
 fullscreen = 0
 
 # Android API level
-android.api = 31
+android.api = 33
 android.minapi = 24
 android.ndk = 25b
 
@@ -41,17 +43,9 @@ android.gradle_options = org.gradle.jvmargs=-Xmx4096m
 # Architecture
 android.archs = arm64-v8a,armeabi-v7a
 
-# Services to add
-android.features = android.hardware.microphone
-
-# Force buildozer to use the latest development branch of python-for-android
+# Force buildozer to use the latest development branch
 p4a.branch = develop
-android.p4a_args = --use-prebuilt-version-for=numpy
 
 [buildozer]
-
-# Log level (0 = error only, 1 = info, 2 = debug)
 log_level = 2
-
-# Display warning on partial build
 warn_on_root = 1
