@@ -7,8 +7,6 @@ An AI-powered spam detection system that uses machine learning to identify spam 
 - **Real-time SMS Analysis** - Instant spam detection with probability scores
 - **Machine Learning** - Naive Bayes classifier with TF-IDF vectorization (~97% accuracy)
 - **Rule-based Detection** - Heuristic filters for common spam patterns
-- **Multi-platform** - Desktop (Windows), Web API, Android APK
-- **Text-to-Speech** - Audio feedback for results (desktop version)
 
 ## Project Structure
 
