@@ -1,165 +1,67 @@
 # SMS Spam Detector
 
-An AI-powered spam detection system that uses machine learning to identify spam SMS messages in real-time. Available as desktop app, web API, and Android APK.
+Android app for detecting spam, phishing, and suspicious SMS with a hybrid detection flow.
 
-## Features
+## What It Does
 
-- **Real-time SMS Analysis** - Instant spam detection with probability scores
-- **Machine Learning** - Naive Bayes classifier with TF-IDF vectorization (~97% accuracy)
-- **Rule-based Detection** - Heuristic filters for common spam patterns
+- Scans incoming SMS and inbox history
+- Classifies messages as `Spam`, `Safe`, or `Needs Review`
+- Shows a recent activity timeline with confidence and risk hints
+- Lets users mark messages as `Safe` or `Spam` so future matching messages follow that learned label
+- Supports fast manual inbox rescans and grouped activity history
 
-## Project Structure
+## How Detection Works
 
-```
-sms-spam-detector/
-├── sms1.py           # Desktop app (CustomTkinter)
-├── app.py            # Web API (Flask)
-├── main.py           # Android app (Kivy)
-├── spam_model.pkl    # Trained ML model
-├── vectorizer.pkl   # TF-IDF vectorizer
-├── spam.csv         # Training data
-├── android_app/      # Android source code
-├── templates/       # Web UI templates
-└── bin/             # Built APKs
-```
+- On-device inference with TensorFlow Lite via `LocalPredictor`
+- Rule-based risk analysis via `RiskAnalyzer`
+- Manual feedback memory stored locally and reused for future messages
+- Real-time SMS interception through `SmsReceiver`
 
-## Quick Start
+Note:
+- The current app is not fully offline-only. Some classification paths may still use the remote API helper fallback when local checks do not make a final decision.
 
-### Desktop App
+## Main Project Structure
 
-```bash
-pip install -r requirements.txt
-python sms1.py
-```
+- `android_app/` Android Studio project
+- `android_app/app/src/main/java/com/example/spamdetector/MainActivity.java` main inbox UI
+- `android_app/app/src/main/java/com/example/spamdetector/SmsReceiver.java` incoming SMS handling
+- `android_app/app/src/main/java/com/example/spamdetector/LocalPredictor.java` local ML inference
+- `android_app/app/src/main/java/com/example/spamdetector/RiskAnalyzer.java` rule-based analysis
+- `android_app/app/src/main/java/com/example/spamdetector/MessageStore.java` encrypted local storage and feedback memory
 
-### Web API
+## Build
 
-```bash
-pip install -r requirements-deploy.txt
-python app.py
-```
+Requirements:
 
-The API runs on `http://localhost:5000`
+- Android Studio
+- Android SDK 34
+- Java/Gradle environment supported by the included project
 
-#### API Endpoints
+From the project root:
 
-| Endpoint | Method | Description |
-|----------|--------|-------------|
-| `/` | GET | Web dashboard |
-| `/predict` | POST | Analyze SMS |
-| `/health` | GET | Health check |
-
-#### Predict Request
-
-```bash
-curl -X POST https://your-api.com/predict \
-  -H "Content-Type: application/json" \
-  -H "X-API-KEY: SMS_GUARD_2024_SECURE" \
-  -d '{"message": "Your SMS text here"}'
+```powershell
+cd android_app
+./gradlew.bat assembleDebug
 ```
 
-#### Response
+Debug APK output:
 
-```json
-{
-  "prediction": "Spam",
-  "confidence": 0.975
-}
-```
+- `android_app/app/build/outputs/apk/debug/app-debug.apk`
 
-### Android APK
+## Current UI
 
-See [README_ANDROID.md](README_ANDROID.md) for detailed Android build instructions.
+- Drawer-based layout with hamburger menu
+- Top stats for spam and safe messages
+- Clean inbox-first recent activity screen
+- Sidebar controls for auto-scan, filters, and scan scope
+- Swipe actions and manual feedback controls
 
-#### Pre-built APK
+## Permissions
 
-Install the APK on your Android device:
+- `RECEIVE_SMS`
+- `READ_SMS`
+- `POST_NOTIFICATIONS`
 
-```bash
-adb install bin/smsspamdetector-1.0-debug.apk
-```
+## Status
 
-## Machine Learning Model
-
-- **Algorithm**: Multinomial Naive Bayes
-- **Features**: TF-IDF vectorized text
-- **Accuracy**: ~97%
-- **Classes**: spam (1) or ham (0)
-
-### Text Preprocessing
-
-1. Remove non-alphanumeric characters
-2. Convert to lowercase
-3. Remove stopwords
-4. Apply Porter Stemmer
-5. TF-IDF vectorization
-
-### Rule-based Enhancement
-
-Additional heuristic filters:
-- Money claims (win, free, prize, earn)
-- Urgency indicators (urgent, immediate)
-- Account actions (verify, login, update)
-- Financial brands (paytm, bank, upi)
-- URLs and links
-
-## Tech Stack
-
-| Component | Technology |
-|-----------|------------|
-| Desktop UI | CustomTkinter |
-| Web Framework | Flask |
-| Mobile UI | Kivy |
-| ML Library | scikit-learn |
-| NLP | NLTK |
-| APK Builder | Buildozer |
-
-## Requirements
-
-```
-pandas
-numpy
-scikit-learn
-nltk
-customtkinter
-flask
-flask-sqlalchemy
-flask-limiter
-requests
-gtts
-playsound
-```
-
-## Deployment
-
-### Railway/Render
-
-1. Connect GitHub repository
-2. Set environment variables:
-   - `PORT`: 5000
-   - `DATABASE_URL`: PostgreSQL connection string
-3. Deploy from `app.py`
-
-### Android APK Build
-
-```bash
-# Windows
-setup.bat
-build.bat
-
-# Linux/Mac
-pip install buildozer cython
-buildozer android debug
-```
-
-See [README_ANDROID.md](README_ANDROID.md) for full build guide.
-
-## License
-
-MIT License
-
-Copyright (c) 2026 prasannapbhurke
-
-## GitHub
-
-https://github.com/prasannapbhurke/sms-spam-detector
+This repository now focuses on the Android application. Older server/deployment files have been removed to keep the repo aligned with the current product.
